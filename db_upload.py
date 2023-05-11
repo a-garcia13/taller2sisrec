@@ -30,6 +30,7 @@ def load_data(file_path, collection):
     else:
         collection.insert_one(data_dict)
 
+'''
 # Loading data into collections in multiple threads
 with ThreadPoolExecutor() as executor:
     executor.submit(load_data, yelp_tip, db.tip)
@@ -42,4 +43,7 @@ with ThreadPoolExecutor() as executor:
 # load_data(yelp_tip, db.tip)
 # load_data(yelp_checkin, db.checkin)
 # load_data(yelp_user, db.user)
-# load_data(yelp_review, db.review)
+
+'''
+
+load_data(yelp_review, db.review)

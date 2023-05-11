@@ -2,14 +2,72 @@ import streamlit as st
 import pandas as pd
 from pymongo import MongoClient
 from streamlit_card import card
+import numpy as np
+from pathlib import Path
+import pickle
 from geopy.geocoders import Nominatim
 import folium
 
 # Establish connection to MongoDB
-client = MongoClient("mongodb://inst-newstic:7E69wh96tzcKjK5u3tnFHK7BwbpT2dbU61JsXxVsYdPNTuazAGNBZQPxNo6xaQcDJbxlsIKmiDrhACDbDy1fmg%3D%3D@inst-newstic.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@inst-newstic@")
+client = MongoClient(
+    "mongodb://inst-newstic:7E69wh96tzcKjK5u3tnFHK7BwbpT2dbU61JsXxVsYdPNTuazAGNBZQPxNo6xaQcDJbxlsIKmiDrhACDbDy1fmg%3D%3D@inst-newstic.mongo.cosmos.azure.com:10255/?ssl=true&replicaSet=globaldb&retrywrites=false&maxIdleTimeMS=120000&appName=@inst-newstic@")
 db = client['yelp_database']
 user_collection = db['user']
 business_collection = db['business']
+review_collection = db['review']
+# Load the trained model
+best_model = pickle.load(open('models/model_SVD.pkl', 'rb'))
+
+
+# Paths
+yelp_path = Path("./data/")
+yelp_processed_data = Path("./processed_data/")
+
+# Ordered by size
+yelp_business = Path(yelp_path, "yelp_academic_dataset_business.json")
+yelp_tip = Path(yelp_path, "yelp_academic_dataset_tip.json")
+yelp_checkin = Path(yelp_path, "yelp_academic_dataset_checkin.json")
+yelp_user = Path(yelp_path, "yelp_academic_dataset_user.json")
+yelp_review = Path(yelp_path, "yelp_academic_dataset_review.json")
+
+
+# Function to load data and insert into MongoDB
+def read_data(file_path):
+    return pd.read_json(file_path, lines=True)
+
+business_data = read_data(yelp_business)
+review_data = read_data(yelp_review)
+
+def get_reviews(user_info):
+    # Use sort() function to sort the MongoDB query by date in descending order
+    # latest_review = review_collection.find({"user_id": user_info}).sort('date', -1).limit(5)
+    try:
+        latest_review = review_collection.find_one({"user_id": user_info})
+        # Create DataFrame from MongoDB query
+        if latest_review is not None:
+            return pd.DataFrame(list(latest_review))
+        else:
+            return None
+    except:
+        st.warning("could not find recent reviews for this user")
+        return None
+
+def get_all_predictions(user_id):
+    # Get a list of all item ids
+    iids = business_data['business_id'].unique()
+
+    # Get a list of ids that the user has rated
+    iids_user_rated = review_data.loc[review_data['user_id'] == user_id, 'business_id'].values
+
+    # Remove the ids that the user has rated from the list of all item ids
+    iids_to_pred = np.setdiff1d(iids, iids_user_rated)
+
+    # Predict the rating for all items that the user hasn't rated yet
+    predictions = [best_model.predict(user_id, iid) for iid in iids_to_pred]
+
+    # return predictions in form of dataframe
+    return pd.DataFrame(predictions).head(10)
+
 
 def show_user_info(user_name):
     user_info = user_collection.find_one({"user_id": user_name})
@@ -30,6 +88,12 @@ def show_user_info(user_name):
             st.write("Useful reviews:", user_info['useful'])
             st.write("Funny reviews:", user_info['funny'])
             st.write("Cool reviews:", user_info['cool'])
+            st.write('Your latest reviews:')
+            reviews_by_user = get_reviews(user_info)
+            if reviews_by_user:
+                st.write(reviews_by_user)
+            else:
+                st.write("You have no reviews")
 
         with col3:
             st.subheader("Compliments:")
@@ -44,8 +108,23 @@ def show_user_info(user_name):
             st.write("Funny:", user_info['compliment_funny'])
             st.write("Writer:", user_info['compliment_writer'])
             st.write("Photos:", user_info['compliment_photos'])
+
+        st.header("Recommendations based on your reviews:")
+        col4, col5, col6 = st.columns(3)
+
+        with col4:
+            st.subheader('Based on your prior recommendations:')
+            top_recommendations = get_all_predictions(user_info)
+            st.write(top_recommendations)
+
+        with col5:
+            st.subheader('Because you reviewed', 'well:')
+
+        with col6:
+            st.subheader('Because', 'likes similar things:')
     else:
         st.write("User not found. Please enter a valid user id.")
+
 
 def show_city_locations(city, state):
     query = {'city': city, 'state': state}
@@ -65,6 +144,7 @@ def show_city_locations(city, state):
         st.write("No business found on", city, ",", state)
         return None
 
+
 def search_by_attribute(city, state, attribute):
     query = {'city': city, 'state': state, 'attribute': {f'{attribute}': True}}
 
@@ -80,6 +160,7 @@ def search_by_attribute(city, state, attribute):
         return df
     else:
         return None
+
 
 def main():
     st.title("Business finder App")
