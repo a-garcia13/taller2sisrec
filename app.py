@@ -117,7 +117,8 @@ def show_user_info(user_name):
             st.write(top_recommendations)
 
         with col5:
-            st.subheader('Because you reviewed', 'well:')
+            st.subheader('Because you reviewed')
+            if reviews_by_user
 
         with col6:
             st.subheader('Because', 'likes similar things:')
