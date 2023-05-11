@@ -168,7 +168,7 @@ def show_user_info(user_name):
             st.write(top_recommendations)
 
         with col5:
-            latest_review = business_collection.find_one({'business_id': reviews_by_user[0]['business_id']})
+            latest_review = business_collection.find_one({'business_id': reviews_by_user.iloc[0]['business_id']})
             st.subheader(f'Because you reviewed', latest_review['name'])
             recommendations_by_item = get_recomendations_by_item(latest_review['business_id'])
             for items in recommendations_by_item:
