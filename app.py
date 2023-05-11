@@ -143,10 +143,7 @@ def show_user_info(user_name):
             st.write("Cool reviews:", user_info['cool'])
             st.write('Your latest reviews:')
             reviews_by_user = get_reviews(user_name)
-            if reviews_by_user:
-                st.write(reviews_by_user)
-            else:
-                st.write("You have no reviews")
+            st.write(reviews_by_user)
 
         with col3:
             st.subheader("Compliments:")
@@ -171,14 +168,13 @@ def show_user_info(user_name):
             st.write(top_recommendations)
 
         with col5:
-            if reviews_by_user:
-                latest_review = business_collection.find_one({'business_id': reviews_by_user[0]['business_id']})
-                st.subheader(f'Because you reviewed', latest_review['name'])
-                recommendations_by_item = get_recomendations_by_item(latest_review['business_id'])
-                for items in recommendations_by_item:
-                    item = business_collection.find_one({'business_id': items})
-                    if item:
-                        st.write(item)
+            latest_review = business_collection.find_one({'business_id': reviews_by_user[0]['business_id']})
+            st.subheader(f'Because you reviewed', latest_review['name'])
+            recommendations_by_item = get_recomendations_by_item(latest_review['business_id'])
+            for items in recommendations_by_item:
+                item = business_collection.find_one({'business_id': items})
+                if item:
+                    st.write(item)
 
         with col6:
             recommendations_by_user = get_recomendations_by_user(user_name)
