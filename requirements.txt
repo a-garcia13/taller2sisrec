@@ -1,0 +1,6 @@
+streamlit~=1.22.0
+pandas~=1.5.3
+numpy~=1.23.5
+folium~=0.14.0
+pymongo~=4.3.3
+geopy~=2.3.0

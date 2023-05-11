@@ -2,11 +2,14 @@ import streamlit as st
 import pandas as pd
 from pymongo import MongoClient
 from streamlit_card import card
-import numpy as np
 from pathlib import Path
 import pickle
 from geopy.geocoders import Nominatim
 import folium
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
+from sklearn.model_selection import train_test_split
+from surprise import Dataset, Reader
 
 # Establish connection to MongoDB
 client = MongoClient(
@@ -15,9 +18,6 @@ db = client['yelp_database']
 user_collection = db['user']
 business_collection = db['business']
 review_collection = db['review']
-# Load the trained model
-best_model = pickle.load(open('models/model_SVD.pkl', 'rb'))
-
 
 # Paths
 yelp_path = Path("./data/")
@@ -38,6 +38,16 @@ def read_data(file_path):
 business_data = read_data(yelp_business)
 review_data = read_data(yelp_review)
 
+# Load the trained model
+best_model = pickle.load(open('models/model_SVD.pkl', 'rb'))
+df_train, df_temp = train_test_split(review_data, test_size=0.2, random_state=42)
+# The columns must correspond to user id, item id and ratings (in that order).
+# Se establece el rango en el cual se aceptaran los ratings
+reader = Reader( rating_scale = ( 1, 5 ) )
+data_train = Dataset.load_from_df(df_train[['user_id', 'business_id', 'stars']], reader)
+train_data = data_train.build_full_trainset()
+best_model.fit(train_data)
+
 def get_reviews(user_info):
     # Filter the review_data DataFrame for rows where the user_id matches user_info
     latest_review = review_data[review_data['user_id'] == user_info]
@@ -45,7 +55,7 @@ def get_reviews(user_info):
     # Check if the resulting DataFrame is not empty
     if not latest_review.empty:
         # Sort the DataFrame by date in descending order and return the top 5 rows
-        return latest_review.sort_values('date', ascending=False).head(5)
+        return latest_review.head(5)
     else:
         print("Could not find recent reviews for this user")
         return None
@@ -66,6 +76,55 @@ def get_all_predictions(user_id):
 
     # return predictions in form of dataframe
     return pd.DataFrame(predictions).head(10)
+
+
+def get_top_n_similar(n, item_id, item_factors):
+    # Fit nearest neighbors
+    knn = NearestNeighbors(n_neighbors=n + 1)  # +1 because the item is most similar to itself
+    knn.fit(item_factors)
+
+    # Get neighbors indices
+    distances, indices = knn.kneighbors(item_factors[item_id].reshape(1, -1))
+
+    # Exclude the item itself
+    return indices[0][1:]
+
+
+def get_top_n_similar_users(n, user_id, user_factors):
+    # Fit nearest neighbors
+    knn = NearestNeighbors(n_neighbors=n + 1)  # +1 because the user is most similar to himself/herself
+    knn.fit(user_factors)
+
+    # Get neighbors indices
+    distances, indices = knn.kneighbors(user_factors[user_id].reshape(1, -1))
+
+    # Exclude the user itself
+    return indices[0][1:]
+
+
+def get_recomendations_by_item(outer_item_id):
+    # Assume best_model is your trained SVD model
+    item_factors = best_model.qi
+
+    item_id = train_data.to_inner_iid(outer_item_id)
+
+    # Get top 5 similar items for item with ID 10
+    similar_items = get_top_n_similar(5, item_id, item_factors)
+    # Transform inner item IDs to raw item IDs
+    similar_items_raw = [train_data.to_raw_iid(i) for i in similar_items]
+    return similar_items_raw
+
+def get_recomendations_by_user(user_id):
+    # Assume best_model is your trained SVD model
+    user_factors = best_model.pu
+
+    user_id = train_data.to_inner_uid(user_id)
+
+    # Get top 5 similar users for user with ID 20
+    similar_users = get_top_n_similar_users(5, user_id, user_factors)
+    # Transform inner user IDs to raw user IDs
+    similar_users_raw = [train_data.to_raw_uid(i) for i in similar_users]
+    return similar_users_raw
 
 
 def show_user_info(user_name):
@@ -117,8 +176,13 @@ def show_user_info(user_name):
             st.write(top_recommendations)
 
         with col5:
-            st.subheader('Because you reviewed')
-            if reviews_by_user
+            if reviews_by_user:
+                latest_review = business_collection.find_one({'business_id': reviews_by_user[0]['business_id']})
+                st.subheader(f'Because you reviewed', latest_review['name'])
+                recommendations_by_item = get_recomendations_by_item(latest_review['business_id'])
+                
+
+
 
         with col6:
             st.subheader('Because', 'likes similar things:')
