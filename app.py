@@ -36,8 +36,9 @@ def read_data(file_path):
     return pd.read_json(file_path, lines=True)
 
 business_data = read_data(yelp_business)
+print("business_data loaded")
 review_data = read_data(yelp_review)
-
+print("review loaded", review_data.shape[0])
 # Load the trained model
 best_model = pickle.load(open('models/model_SVD.pkl', 'rb'))
 df_train, df_temp = train_test_split(review_data, test_size=0.2, random_state=42)
@@ -51,14 +52,8 @@ best_model.fit(train_data)
 def get_reviews(user_info):
     # Filter the review_data DataFrame for rows where the user_id matches user_info
     latest_review = review_data[review_data['user_id'] == user_info]
-
-    # Check if the resulting DataFrame is not empty
-    if not latest_review.empty:
-        # Sort the DataFrame by date in descending order and return the top 5 rows
-        return latest_review.head(5)
-    else:
-        print("Could not find recent reviews for this user")
-        return None
+    # Sort the DataFrame by date in descending order and return the top 5 rows
+    return latest_review.head(5)
 
 
 def get_all_predictions(user_id):
@@ -147,7 +142,7 @@ def show_user_info(user_name):
             st.write("Funny reviews:", user_info['funny'])
             st.write("Cool reviews:", user_info['cool'])
             st.write('Your latest reviews:')
-            reviews_by_user = get_reviews(user_info)
+            reviews_by_user = get_reviews(user_name)
             if reviews_by_user:
                 st.write(reviews_by_user)
             else:
@@ -172,7 +167,7 @@ def show_user_info(user_name):
 
         with col4:
             st.subheader('Based on your prior recommendations:')
-            top_recommendations = get_all_predictions(user_info)
+            top_recommendations = get_all_predictions(user_name)
             st.write(top_recommendations)
 
         with col5:
@@ -186,7 +181,7 @@ def show_user_info(user_name):
                         st.write(item)
 
         with col6:
-            recommendations_by_user = get_recomendations_by_user(user_info)
+            recommendations_by_user = get_recomendations_by_user(user_name)
             st.subheader('Because', recommendations_by_user[0], 'likes similar things to you:')
             reviews_by_similar_user = get_all_predictions(recommendations_by_user[0])
             st.write(reviews_by_similar_user)
