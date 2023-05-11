@@ -39,18 +39,17 @@ business_data = read_data(yelp_business)
 review_data = read_data(yelp_review)
 
 def get_reviews(user_info):
-    # Use sort() function to sort the MongoDB query by date in descending order
-    # latest_review = review_collection.find({"user_id": user_info}).sort('date', -1).limit(5)
-    try:
-        latest_review = review_collection.find_one({"user_id": user_info})
-        # Create DataFrame from MongoDB query
-        if latest_review is not None:
-            return pd.DataFrame(list(latest_review))
-        else:
-            return None
-    except:
-        st.warning("could not find recent reviews for this user")
+    # Filter the review_data DataFrame for rows where the user_id matches user_info
+    latest_review = review_data[review_data['user_id'] == user_info]
+
+    # Check if the resulting DataFrame is not empty
+    if not latest_review.empty:
+        # Sort the DataFrame by date in descending order and return the top 5 rows
+        return latest_review.sort_values('date', ascending=False).head(5)
+    else:
+        print("Could not find recent reviews for this user")
         return None
+
 
 def get_all_predictions(user_id):
     # Get a list of all item ids
