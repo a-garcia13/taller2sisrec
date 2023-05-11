@@ -180,12 +180,16 @@ def show_user_info(user_name):
                 latest_review = business_collection.find_one({'business_id': reviews_by_user[0]['business_id']})
                 st.subheader(f'Because you reviewed', latest_review['name'])
                 recommendations_by_item = get_recomendations_by_item(latest_review['business_id'])
-                
-
-
+                for items in recommendations_by_item:
+                    item = business_collection.find_one({'business_id': items})
+                    if item:
+                        st.write(item)
 
         with col6:
-            st.subheader('Because', 'likes similar things:')
+            recommendations_by_user = get_recomendations_by_user(user_info)
+            st.subheader('Because', recommendations_by_user[0], 'likes similar things to you:')
+            reviews_by_similar_user = get_all_predictions(recommendations_by_user[0])
+            st.write(reviews_by_similar_user)
     else:
         st.write("User not found. Please enter a valid user id.")
 
